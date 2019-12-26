@@ -28,7 +28,7 @@ class CSA(BaseModel):
                                    opt.fineSize, opt.fineSize)
 
         # batchsize should be 1 for mask_global
-        self.mask_global = torch.ByteTensor(1, 1, opt.fineSize, opt.fineSize)
+        self.mask_global = torch.BoolTensor(1, 1, opt.fineSize, opt.fineSize)
 
 
         self.mask_global.zero_()
@@ -120,7 +120,7 @@ class CSA(BaseModel):
 
         self.ex_mask = self.mask_global.expand(1, 3, self.mask_global.size(2), self.mask_global.size(3)) # 1*c*h*w
 
-        self.inv_ex_mask = torch.add(torch.neg(self.ex_mask.float()), 1).byte()
+        self.inv_ex_mask = torch.add(torch.neg(self.ex_mask.float()), 1).bool()
         self.input_A.narrow(1,0,1).masked_fill_(self.mask_global, 2*123.0/255.0 - 1.0)
         self.input_A.narrow(1,1,1).masked_fill_(self.mask_global, 2*104.0/255.0 - 1.0)
         self.input_A.narrow(1,2,1).masked_fill_(self.mask_global, 2*117.0/255.0 - 1.0)
