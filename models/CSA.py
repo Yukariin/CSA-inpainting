@@ -20,8 +20,7 @@ class CSA(BaseModel):
         self.isTrain = opt.isTrain
 
 
-        self.vgg=Vgg16(requires_grad=False)
-        self.vgg=self.vgg.cuda()
+        self.vgg = Vgg16(requires_grad=False).cuda()
         self.input_A = self.Tensor(opt.batchSize, opt.input_nc,
                                    opt.fineSize, opt.fineSize)
         self.input_B = self.Tensor(opt.batchSize, opt.output_nc,
@@ -98,11 +97,10 @@ class CSA(BaseModel):
                 networks.print_network(self.netF)
             print('-----------------------------------------------')
 
-    def set_input(self,input,mask):
-
+    def set_input(self, input, mask):
         input_A = input
         input_B = input.clone()
-        input_mask=mask
+        input_mask = mask
 
         self.input_A.resize_(input_A.size()).copy_(input_A)
         self.input_B.resize_(input_B.size()).copy_(input_B)
@@ -110,11 +108,10 @@ class CSA(BaseModel):
         self.image_paths = 0
 
         if self.opt.mask_type == 'center':
-            self.mask_global=self.mask_global
-
+            self.mask_global = self.mask_global
         elif self.opt.mask_type == 'random':
             self.mask_global.zero_()
-            self.mask_global=input_mask
+            self.mask_global = input_mask
         else:
             raise ValueError("Mask_type [%s] not recognized." % self.opt.mask_type)
 
@@ -169,18 +166,15 @@ class CSA(BaseModel):
         self.gt_latent_real = self.vgg(Variable(self.input_B, requires_grad=False))
         real_AB = self.real_B # GroundTruth
 
-
-
-
         self.pred_fake = self.netD(fake_AB.detach())
         self.pred_real = self.netD(real_AB)
         self.loss_D_fake = self.criterionGAN(self.pred_fake, self.pred_real, True)
 
         self.pred_fake_F = self.netF(self.gt_latent_fake.relu3_3.detach())
         self.pred_real_F = self.netF(self.gt_latent_real.relu3_3)
-        self.loss_F_fake = self.criterionGAN(self.pred_fake_F,self.pred_real_F, True)
+        self.loss_F_fake = self.criterionGAN(self.pred_fake_F, self.pred_real_F, True)
 
-        self.loss_D =self.loss_D_fake * 0.5 + self.loss_F_fake  * 0.5
+        self.loss_D = self.loss_D_fake * 0.5 + self.loss_F_fake  * 0.5
 
         # When two losses are ready, together backward.
         # It is op, so the backward will be called from a leaf.(quite different from LuaTorch)
@@ -190,17 +184,19 @@ class CSA(BaseModel):
         # First, G(A) should fake the discriminator
         fake_AB = self.fake_B
         fake_f = self.gt_latent_fake
-        
-        pred_fake = self.netD(fake_AB)
-        pred_fake_f = self.netF(fake_f.relu3_3)
-        
-        pred_real=self.netD(self.real_B)
-        pred_real_F=self.netF(self.gt_latent_real.relu3_3)
 
-        self.loss_G_GAN = self.criterionGAN(pred_fake,pred_real, False)+self.criterionGAN(pred_fake_f, pred_real_F,False)
+        pred_fake = self.netD(fake_AB)
+        pred_real = self.netD(self.real_B)
+        loss_D_real = self.criterionGAN(pred_fake, pred_real, False)
+
+        pred_fake_F = self.netF(fake_f.relu3_3)
+        pred_real_F = self.netF(self.gt_latent_real.relu3_3)
+        loss_F_real = self.criterionGAN(pred_fake_F, pred_real_F, False)
+
+        self.loss_G_GAN = loss_D_real + loss_F_real
 
         # Second, G(A) = B
-        self.loss_G_L1 =( self.criterionL1(self.fake_B, self.real_B) +self.criterionL1(self.fake_P, self.real_B) )* self.opt.lambda_A
+        self.loss_G_L1 = (self.criterionL1(self.fake_B, self.real_B) + self.criterionL1(self.fake_P, self.real_B)) * self.opt.lambda_A
 
 
         self.loss_G = self.loss_G_L1 + self.loss_G_GAN * self.opt.gan_weight
@@ -242,7 +238,6 @@ class CSA(BaseModel):
                             ])
 
     def get_current_visuals(self):
-
         real_A =self.real_A.data
         fake_B = self.fake_B.data
         real_B =self.real_B.data

@@ -1,7 +1,10 @@
 import torch.nn as nn
 import torch
 from torch.autograd import Variable
+
 import util.util as util
+
+
 class InnerCos(nn.Module):
     def __init__(self, crit='MSE', strength=1, skip=0):
         super(InnerCos, self).__init__()
@@ -28,16 +31,13 @@ class InnerCos(nn.Module):
         return self.target
 
     def forward(self, in_data):
+        self.output = in_data
         if not self.skip:
-            self.bs, self.c, _, _ = in_data.size()
             self.former = in_data
             self.former_in_mask = torch.mul(self.former, self.mask)
-
             self.loss = self.criterion(self.former_in_mask * self.strength, self.target)
-            self.output = in_data
         else:
             self.loss = 0
-            self.output = in_data
         return self.output
 
 
@@ -47,7 +47,7 @@ class InnerCos(nn.Module):
         return self.loss
 
     def __repr__(self):
-        skip_str = 'True' if not self.skip else 'False'
+        skip_str = 'True' if self.skip else 'False'
         return self.__class__.__name__+ '(' \
-              + 'skip: ' + skip_str \
-              + ' ,strength: ' + str(self.strength) + ')'
+              + 'skip=' + skip_str \
+              + ', strength=' + str(self.strength) + ')'
