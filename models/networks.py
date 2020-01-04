@@ -335,7 +335,8 @@ class CSA(nn.Module):
             upconv_3 = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
                                         kernel_size=3, stride=1,
                                         padding=1)
-            down = [downrelu, downconv, downnorm,downrelu_3,downconv_3,csa,innerCos,downnorm_3]
+            #down = [downrelu, downconv, downnorm,downrelu_3,downconv_3,csa,innerCos,downnorm_3]
+            down = [downrelu, downconv, downnorm,downrelu_3,downconv_3,innerCos,downnorm_3]
             up = [innerCos2,uprelu_3,upconv_3,upnorm_3,uprelu, upconv, upnorm]
 
             if use_dropout:
@@ -491,19 +492,22 @@ class NLayerDiscriminator(nn.Module):
 
     def forward(self, input):
         return self.model(input)
+
+
 class PFDiscriminator(nn.Module):
     def __init__(self):
-
        super(PFDiscriminator, self).__init__()
 
 
        self.model=nn.Sequential(
            nn.Conv2d(256, 512,kernel_size=4, stride=2,padding=1),
            nn.LeakyReLU(0.2, True),
-           nn.Conv2d(512, 512,kernel_size=4, stride=2,padding=1),
-           nn.InstanceNorm2d(512),
+
+           nn.Conv2d(512, 512,kernel_size=4, stride=1,padding=1),
+           nn.InstanceNorm2d(512, affine=True),
            nn.LeakyReLU(0.2, True),
-           nn.Conv2d(512, 512,kernel_size=4, stride=2,padding=1)
+
+           nn.Conv2d(512, 512,kernel_size=4, stride=1,padding=1)
 
        )
 
