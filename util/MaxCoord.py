@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
+
+
 # Input is a tensor
 # Input has to be 1*N*H*W
 # output and ind: are all 0-index!!
@@ -17,14 +19,15 @@ class MaxCoord():
         input_dim = input.dim()
         assert input.dim() == 4, "Input must be 3D or 4D(batch)."
         assert input.size(0) == 1, "The first dimension of input has to be 1!"
-#同样大小 并且为0的tensor
+
+        # 同样大小 并且为0的tensor
         output = torch.zeros_like(input)
 
-        v_max,c_max = torch.max(input, 1)
+        v_max, c_max = torch.max(input, 1)
 
         c_max_flatten = c_max.view(-1)
         v_max_flatten = v_max.view(-1)
-       # output[:, c_max_flatten, sp_x, sp_y] = 1
+        # output[:, c_max_flatten, sp_x, sp_y] = 1
         ind = c_max_flatten
 
         return output, ind,  v_max_flatten

@@ -26,20 +26,18 @@ class InnerCos2(nn.Module):
     def set_target(self, targetIn):
         self.target = targetIn
 
-
     def get_target(self):
         return self.target
 
     def forward(self, in_data):
         self.output = in_data
         if not self.skip:
-            self.former = in_data.narrow(1,0,512)
+            self.former = in_data.narrow(1, 0, 512)
             self.former_in_mask = torch.mul(self.former, self.mask)
             self.loss = self.criterion(self.former_in_mask * self.strength, self.target)
         else:
             self.loss = 0
         return self.output
-
 
     def backward(self, retain_graph=True):
         if not self.skip:
@@ -48,6 +46,6 @@ class InnerCos2(nn.Module):
 
     def __repr__(self):
         skip_str = 'True' if self.skip else 'False'
-        return self.__class__.__name__+ '(' \
-              + 'skip=' + skip_str \
-              + ', strength=' + str(self.strength) + ')'
+        return self.__class__.__name__ + '(' \
+            + 'skip=' + skip_str \
+            + ', strength=' + str(self.strength) + ')'

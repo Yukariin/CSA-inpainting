@@ -1,13 +1,15 @@
-#-*-coding:utf-8-*-
+# -*-coding:utf-8-*-
+
+from collections import OrderedDict
 
 import torch
-from collections import OrderedDict
+import torch.nn.functional as F
 from torch.autograd import Variable
 
-import torch.nn.functional as F
 from .base_model import BaseModel
 from . import networks
 from .vgg16 import Vgg16
+
 
 class CSA(BaseModel):
     def name(self):
@@ -15,10 +17,10 @@ class CSA(BaseModel):
 
     def initialize(self, opt):
         BaseModel.initialize(self, opt)
+
         self.device = torch.device('cuda')
         self.opt = opt
         self.isTrain = opt.isTrain
-
 
         self.vgg = Vgg16(requires_grad=False).cuda()
         self.input_A = self.Tensor(opt.batchSize, opt.input_nc,
@@ -29,10 +31,9 @@ class CSA(BaseModel):
         # batchsize should be 1 for mask_global
         self.mask_global = torch.BoolTensor(1, 1, opt.fineSize, opt.fineSize)
 
-
         self.mask_global.zero_()
-        self.mask_global[:, :, int(self.opt.fineSize/4) + self.opt.overlap : int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap,\
-                                int(self.opt.fineSize/4) + self.opt.overlap: int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap] = 1
+        self.mask_global[:, :, int(self.opt.fineSize/4) + self.opt.overlap:int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap,
+                         int(self.opt.fineSize/4) + self.opt.overlap:int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap] = 1
 
         self.mask_type = opt.mask_type
         self.gMask_opts = {}
@@ -41,22 +42,33 @@ class CSA(BaseModel):
             self.use_gpu = True
             self.mask_global = self.mask_global.cuda()
 
-        self.netG,self.Cosis_list,self.Cosis_list2, self.CSA_model= networks.define_G(opt.input_nc_g, opt.output_nc, opt.ngf,
-                                      opt.which_model_netG, opt, self.mask_global, opt.norm, opt.use_dropout, opt.init_type, self.gpu_ids, opt.init_gain)
-        self.netP,_,_,_=networks.define_G(opt.input_nc, opt.output_nc, opt.ngf,
-                                    opt.which_model_netP, opt, self.mask_global, opt.norm, opt.use_dropout, opt.init_type, self.gpu_ids, opt.init_gain)
+        self.netG, self.Cosis_list, self.Cosis_list2, self.CSA_model = networks.define_G(
+            opt.input_nc_g, opt.output_nc, opt.ngf,
+            opt.which_model_netG, opt, self.mask_global, opt.norm, opt.use_dropout, opt.init_type,
+            self.gpu_ids,
+            opt.init_gain)
+        self.netP, _, _, _ = networks.define_G(
+            opt.input_nc, opt.output_nc, opt.ngf,
+            opt.which_model_netP, opt, self.mask_global, opt.norm, opt.use_dropout, opt.init_type,
+            self.gpu_ids,
+            opt.init_gain)
         if self.isTrain:
             use_sigmoid = False
             if opt.gan_type == 'vanilla':
                 use_sigmoid = True  # only vanilla GAN using BCECriterion
 
-            self.netD = networks.define_D(opt.input_nc, opt.ndf,
-                                          opt.which_model_netD,
-                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids, opt.init_gain)
-            self.netF = networks.define_D(opt.input_nc, opt.ndf,
-                                          opt.which_model_netF,
-                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids,
-                                          opt.init_gain)            
+            self.netD = networks.define_D(
+                opt.input_nc, opt.ndf,
+                opt.which_model_netD,
+                opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type,
+                self.gpu_ids,
+                opt.init_gain)
+            self.netF = networks.define_D(
+                opt.input_nc, opt.ndf,
+                opt.which_model_netF,
+                opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type,
+                self.gpu_ids,
+                opt.init_gain)
         if not self.isTrain or opt.continue_train:
             print('Loading pre-trained network!')
             self.load_network(self.netG, 'G', opt.which_epoch)
@@ -74,14 +86,18 @@ class CSA(BaseModel):
             # initialize optimizers
             self.schedulers = []
             self.optimizers = []
-            self.optimizer_G = torch.optim.Adam(self.netG.parameters(),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_P = torch.optim.Adam(self.netP.parameters(),
-                                lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_D = torch.optim.Adam(self.netD.parameters(),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_F = torch.optim.Adam(self.netF.parameters(),
-                                lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = torch.optim.Adam(
+                self.netG.parameters(),
+                lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_P = torch.optim.Adam(
+                self.netP.parameters(),
+                lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_D = torch.optim.Adam(
+                self.netD.parameters(),
+                lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_F = torch.optim.Adam(
+                self.netF.parameters(),
+                lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_P)
             self.optimizers.append(self.optimizer_D)
@@ -115,12 +131,13 @@ class CSA(BaseModel):
         else:
             raise ValueError("Mask_type [%s] not recognized." % self.opt.mask_type)
 
-        self.ex_mask = self.mask_global.expand(1, 3, self.mask_global.size(2), self.mask_global.size(3)) # 1*c*h*w
+        # 1*c*h*w
+        self.ex_mask = self.mask_global.expand(1, 3, self.mask_global.size(2), self.mask_global.size(3))
 
         self.inv_ex_mask = torch.add(torch.neg(self.ex_mask.float()), 1).bool()
-        self.input_A.narrow(1,0,1).masked_fill_(self.mask_global, 2*123.0/255.0 - 1.0)
-        self.input_A.narrow(1,1,1).masked_fill_(self.mask_global, 2*104.0/255.0 - 1.0)
-        self.input_A.narrow(1,2,1).masked_fill_(self.mask_global, 2*117.0/255.0 - 1.0)
+        self.input_A.narrow(1, 0, 1).masked_fill_(self.mask_global, 2*123.0/255.0 - 1.0)
+        self.input_A.narrow(1, 1, 1).masked_fill_(self.mask_global, 2*104.0/255.0 - 1.0)
+        self.input_A.narrow(1, 2, 1).masked_fill_(self.mask_global, 2*117.0/255.0 - 1.0)
 
         self.set_latent_mask(self.mask_global, 3, self.opt.threshold)
 
@@ -129,35 +146,37 @@ class CSA(BaseModel):
         self.CSA_model[0].set_mask(mask_global, layer_to_last, threshold)
         self.Cosis_list[0].set_mask(mask_global, self.opt)
         self.Cosis_list2[0].set_mask(mask_global, self.opt)
+
     def forward(self):
         self.real_A =self.input_A.to(self.device)
-        self.fake_P= self.netP(self.real_A)
-        self.un=self.fake_P.clone()
-        self.Unknowregion=self.un.data.masked_fill_(self.inv_ex_mask, 0)
-        self.knownregion=self.real_A.data.masked_fill_(self.ex_mask, 0)
-        self.Syn=self.Unknowregion+self.knownregion
-        self.Middle=torch.cat((self.Syn,self.input_A),1)
+        self.fake_P = self.netP(self.real_A)
+
+        self.un = self.fake_P.clone()
+        self.Unknowregion = self.un.data.masked_fill_(self.inv_ex_mask, 0)
+        self.knownregion = self.real_A.data.masked_fill_(self.ex_mask, 0)
+        self.Syn = self.Unknowregion+self.knownregion
+
+        self.Middle = torch.cat((self.Syn, self.input_A), 1)
         self.fake_B = self.netG(self.Middle)
         self.real_B = self.input_B.to(self.device)
 
     def set_gt_latent(self):
-        gt_latent=self.vgg(Variable(self.input_B,requires_grad=False))
+        gt_latent = self.vgg(Variable(self.input_B, requires_grad=False))
         self.Cosis_list[0].set_target(gt_latent.relu4_3)
         self.Cosis_list2[0].set_target(gt_latent.relu4_3)
 
-
     def test(self):
         self.real_A = self.input_A.to(self.device)
-        self.fake_P= self.netP(self.real_A)
-        self.un=self.fake_P.clone()
-        self.Unknowregion=self.un.data.masked_fill_(self.inv_ex_mask, 0)
-        self.knownregion=self.real_A.data.masked_fill_(self.ex_mask, 0)
-        self.Syn=self.Unknowregion+self.knownregion
-        self.Middle=torch.cat((self.Syn,self.input_A),1)
+        self.fake_P = self.netP(self.real_A)
+
+        self.un = self.fake_P.clone()
+        self.Unknowregion = self.un.data.masked_fill_(self.inv_ex_mask, 0)
+        self.knownregion = self.real_A.data.masked_fill_(self.ex_mask, 0)
+        self.Syn = self.Unknowregion+self.knownregion
+
+        self.Middle = torch.cat((self.Syn, self.input_A), 1)
         self.fake_B = self.netG(self.Middle)
         self.real_B = self.input_B.to(self.device)
-
-
 
     def backward_D(self):
         fake_AB = self.fake_B
@@ -174,7 +193,7 @@ class CSA(BaseModel):
         self.pred_real_F = self.netF(self.gt_latent_real.relu3_3)
         self.loss_F_fake = self.criterionGAN(self.pred_fake_F, self.pred_real_F, True)
 
-        self.loss_D = self.loss_D_fake * 0.5 + self.loss_F_fake  * 0.5
+        self.loss_D = self.loss_D_fake * 0.5 + self.loss_F_fake * 0.5
 
         # When two losses are ready, together backward.
         # It is op, so the backward will be called from a leaf.(quite different from LuaTorch)
@@ -198,7 +217,6 @@ class CSA(BaseModel):
         # Second, G(A) = B
         self.loss_G_L1 = (self.criterionL1(self.fake_B, self.real_B) + self.criterionL1(self.fake_P, self.real_B)) * self.opt.lambda_A
 
-
         self.loss_G = self.loss_G_L1 + self.loss_G_GAN * self.opt.gan_weight
 
         # Third add additional netG contraint loss!
@@ -218,17 +236,18 @@ class CSA(BaseModel):
 
     def optimize_parameters(self):
         self.forward()
+
         self.optimizer_D.zero_grad()
         self.optimizer_F.zero_grad()
         self.backward_D()
         self.optimizer_D.step()
         self.optimizer_F.step()
+
         self.optimizer_G.zero_grad()
         self.optimizer_P.zero_grad()
         self.backward_G()
         self.optimizer_G.step()
         self.optimizer_P.step()
-
 
     def get_current_errors(self):
         return OrderedDict([('G_GAN', self.loss_G_GAN.data.item()),
@@ -238,12 +257,11 @@ class CSA(BaseModel):
                             ])
 
     def get_current_visuals(self):
-        real_A =self.real_A.data
+        real_A = self.real_A.data
         fake_B = self.fake_B.data
-        real_B =self.real_B.data
+        real_B = self.real_B.data
 
-        return real_A,real_B,fake_B
-
+        return real_A, real_B, fake_B
 
     def save(self, epoch):
         self.save_network(self.netG, 'G', epoch, self.gpu_ids)
@@ -254,5 +272,3 @@ class CSA(BaseModel):
     def load(self, epoch):
         self.load_network(self.netG, 'G', epoch)
         self.load_network(self.netP, 'P', epoch)
-
-

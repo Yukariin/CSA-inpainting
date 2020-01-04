@@ -26,7 +26,6 @@ class InnerCos(nn.Module):
     def set_target(self, targetIn):
         self.target = targetIn
 
-
     def get_target(self):
         return self.target
 
@@ -40,7 +39,6 @@ class InnerCos(nn.Module):
             self.loss = 0
         return self.output
 
-
     def backward(self, retain_graph=True):
         if not self.skip:
             self.loss.backward(retain_graph=retain_graph)
@@ -48,6 +46,6 @@ class InnerCos(nn.Module):
 
     def __repr__(self):
         skip_str = 'True' if self.skip else 'False'
-        return self.__class__.__name__+ '(' \
-              + 'skip=' + skip_str \
-              + ', strength=' + str(self.strength) + ')'
+        return self.__class__.__name__ + '(' \
+            + 'skip=' + skip_str \
+            + ', strength=' + str(self.strength) + ')'

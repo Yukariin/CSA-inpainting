@@ -1,19 +1,19 @@
-import random
-import torch
-from PIL import Image
 from glob import glob
+import random
+
+from PIL import Image
+import torch
 
 
 class Data_load(torch.utils.data.Dataset):
     def __init__(self, img_root, mask_root, img_transform, mask_transform):
         super(Data_load, self).__init__()
+
         self.img_transform = img_transform
         self.mask_transform = mask_transform
 
-
         self.paths = glob('{:s}/*'.format(img_root),
-                              recursive=True)
-
+                          recursive=True)
 
         self.mask_paths = glob('{:s}/*.png'.format(mask_root))
 
@@ -25,7 +25,7 @@ class Data_load(torch.utils.data.Dataset):
 
         mask = Image.open(self.mask_paths[random.randint(0, self.N_mask - 1)])
         mask = self.mask_transform(mask.convert('RGB'))
-        return gt_img , mask
+        return gt_img, mask
 
     def __len__(self):
         return len(self.paths)
